@@ -1,0 +1,41 @@
+name: Build Windows EXE
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies (CPU-only torch)
+        run: |
+          pip install -r element_separator/requirements.txt
+          pip install pyinstaller
+
+      - name: Download the SAM model weights (~375MB, one time per build)
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri "https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth" -OutFile sam_vit_b_01ec64.pth
+
+      - name: Build the .exe
+        run: pyinstaller --onefile --windowed --name ElementSeparator element_separator/gui_app.py
+
+      - name: Put the model weights next to the built app
+        shell: pwsh
+        run: Copy-Item sam_vit_b_01ec64.pth -Destination dist\sam_vit_b_01ec64.pth
+
+      - name: Upload the ready-to-run app
+        uses: actions/upload-artifact@v4
+        with:
+          name: ElementSeparator-Windows
+          path: dist/
